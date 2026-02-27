@@ -621,8 +621,17 @@ def _save_cookies(cookies):
 
 
 # ===== Crawling task runner =====
-def _run_crawl_task(task_id: str, keywords: list, platform: str):
+def _run_crawl_task(task_id: str, keywords: list, platform: str, config_task_id: str = ""):
     """在后台线程中执行爬取任务"""
+    # 统一在执行入口处检查 enable，无论由哪个触发路径调用
+    if config_task_id:
+        with _configs_lock:
+            configs = _load_configs()
+        task_cfg = next((c for c in configs if c.get("id") == config_task_id), None)
+        if task_cfg and not task_cfg.get("enable", True):
+            logger.info(f"[Scheduler] 任务 {config_task_id} 已暂停，跳过本次执行")
+            return
+
     key = f"{'_'.join(keywords[:1])}_{platform}"
     with _running_lock:
         _running_tasks[key] = {
@@ -682,6 +691,7 @@ def _scheduler_loop():
                         t = threading.Thread(
                             target=_run_crawl_task,
                             args=(str(uuid.uuid4()), keywords, platform),
+                            kwargs={"config_task_id": task_id},
                             daemon=True,
                         )
                         t.start()
@@ -811,6 +821,7 @@ def add_config():
         "id": str(uuid.uuid4())[:8],
         "config": {"keywords": keywords, "platforms": platforms, "interval": interval},
         "created_at": datetime.now(tz=timezone(timedelta(hours=8))).isoformat(),
+        "enable": True,
     }
     with _configs_lock:
         configs = _load_configs()
@@ -818,6 +829,18 @@ def add_config():
         _save_configs(configs)
 
     return jsonify({"success": True, "data": task})
+
+
+@monitoring_bp.route('/api/crawler/config/<task_id>', methods=['PATCH'])
+def toggle_config(task_id):
+    with _configs_lock:
+        configs = _load_configs()
+        for c in configs:
+            if c.get("id") == task_id:
+                c["enable"] = not c.get("enable", True)
+                _save_configs(configs)
+                return jsonify({"success": True, "enable": c["enable"]})
+    return jsonify({"success": False, "message": "任务不存在"}), 404
 
 
 @monitoring_bp.route('/api/crawler/config/<task_id>', methods=['DELETE'])

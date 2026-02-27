@@ -279,6 +279,53 @@
             color: #303133;
         }
 
+        .config-item.paused {
+            border-left-color: #d9dfe6;
+            opacity: 0.75;
+        }
+
+        .status-paused {
+            background: #f5f5f5;
+            color: #909399;
+            border: 1px solid #d9dfe6;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .pause-btn {
+            background: #fff;
+            color: #d48806;
+            border: 1px solid #ffe58f;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .pause-btn:hover {
+            background: #fffbe6;
+        }
+
+        .pause-btn.resume {
+            color: #389e0d;
+            border-color: #b7eb8f;
+        }
+
+        .pause-btn.resume:hover {
+            background: #f6ffed;
+        }
+
+        .pause-btn:disabled {
+            color: #c0c4cc;
+            border-color: #e8ecf0;
+            background: #f5f7fa;
+            cursor: not-allowed;
+        }
+
         .delete-btn {
             background: #fff;
             color: #ff4d4f;
@@ -901,15 +948,17 @@
 
             configs.forEach(task => {
                 const config = task.config;
+                const enabled = task.enable !== false;
                 const item = document.createElement('div');
-                item.className = 'config-item';
+                item.className = 'config-item' + (enabled ? '' : ' paused');
 
                 const platformNames = config.platforms.map(p => {
                     const platform = availablePlatforms.find(ap => ap.code === p);
                     return platform ? platform.name : p;
                 }).join('、');
 
-                const status = getTaskStatus(task, runningDetails);
+                const status = enabled ? getTaskStatus(task, runningDetails) : { label: '已暂停', css: 'status-paused' };
+                const isRunning = status.label === '运行中';
 
                 item.innerHTML = `
                     <div class="config-item-header">
@@ -917,7 +966,14 @@
                             📋 任务ID: ${task.id}
                             <span class="status-badge ${status.css}">${status.label}</span>
                         </div>
-                        <button class="delete-btn" onclick="deleteConfig('${task.id}')">删除</button>
+                        <div class="item-actions">
+                            <button class="pause-btn ${enabled ? '' : 'resume'}"
+                                onclick="toggleEnable('${task.id}', ${enabled})"
+                                ${isRunning ? 'disabled title="任务运行中，请等待完成后再暂停"' : ''}>
+                                ${enabled ? '暂停' : '恢复'}
+                            </button>
+                            <button class="delete-btn" onclick="deleteConfig('${task.id}')">删除</button>
+                        </div>
                     </div>
                     <div class="config-item-details">
                         <div><strong>关键词:</strong> ${config.keywords.join('、')}</div>
@@ -929,6 +985,24 @@
 
                 container.appendChild(item);
             });
+        }
+
+        // 暂停/恢复任务
+        async function toggleEnable(taskId, currentEnable) {
+            try {
+                const response = await fetch(`/monitoring/api/crawler/config/${taskId}`, {
+                    method: 'PATCH'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showMessage(result.enable ? '任务已恢复' : '任务已暂停', 'success');
+                    loadCurrentConfigs();
+                } else {
+                    showMessage(result.message || '操作失败', 'error');
+                }
+            } catch (error) {
+                showMessage('网络错误：' + error.message, 'error');
+            }
         }
 
         // 删除配置
