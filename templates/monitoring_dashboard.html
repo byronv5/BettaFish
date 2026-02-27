@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>舆情监控仪表板</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #fff;
+            border-radius: 4px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e8ecf0;
+        }
+
+        .header h1 {
+            color: #303133;
+            font-size: 20px;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .header .subtitle {
+            color: #909399;
+            font-size: 13px;
+        }
+
+        .topic-card {
+            background: #fff;
+            border-radius: 4px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e8ecf0;
+        }
+
+        .topic-card h2 {
+            color: #303133;
+            font-size: 16px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .topic-card .topic-name {
+            color: #2d5f8a;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .topic-card .topic-desc {
+            color: #606266;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .topic-card .keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .keyword-tag {
+            background: #e8f0f7;
+            color: #2d5f8a;
+            padding: 4px 12px;
+            border-radius: 3px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .topic-card .meta {
+            color: #909399;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+
+        .topic-refresh-btn {
+            padding: 2px 10px;
+            font-size: 12px;
+            background: #f0f4f8;
+            color: #606266;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            cursor: pointer;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+
+        .topic-refresh-btn:hover:not(:disabled) {
+            background: #e6ecf5;
+            color: #2d5f8a;
+            border-color: #b3c6d9;
+        }
+
+        .topic-refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .topic-refresh-msg {
+            font-size: 12px;
+            color: #909399;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .topic-refresh-msg.success { color: #67c23a; }
+        .topic-refresh-msg.error   { color: #f56c6c; }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .chart-card {
+            background: #fff;
+            border-radius: 4px;
+            padding: 20px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e8ecf0;
+        }
+
+        .chart-card h3 {
+            color: #303133;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e8ecf0;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 350px;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 350px;
+            color: #909399;
+            font-size: 14px;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .error-message {
+            background: #fff2f0;
+            color: #cf1322;
+            padding: 12px 16px;
+            border-radius: 4px;
+            border: 1px solid #ffccc7;
+            margin: 16px 0;
+            font-size: 13px;
+        }
+
+        .refresh-btn, .config-btn {
+            background: #2d5f8a;
+            color: #fff;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            margin-right: 8px;
+        }
+
+        .config-btn {
+            background: #fff;
+            color: #606266;
+            border: 1px solid #d9dfe6;
+        }
+
+        .refresh-btn:hover {
+            background: #1d4a6e;
+        }
+
+        .config-btn:hover {
+            border-color: #2d5f8a;
+            color: #2d5f8a;
+        }
+
+        .refresh-btn:active, .config-btn:active {
+            transform: none;
+        }
+
+        .keyword-filter {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 16px;
+            vertical-align: middle;
+        }
+
+        .keyword-filter label {
+            color: #606266;
+            font-size: 13px;
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+
+        .keyword-filter select {
+            padding: 7px 12px;
+            border: 1px solid #d9dfe6;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #303133;
+            background: #fff;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+            min-width: 140px;
+        }
+
+        .keyword-filter select:focus {
+            border-color: #2d5f8a;
+        }
+
+        .date-filter {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 16px;
+            vertical-align: middle;
+        }
+
+        .date-filter label {
+            color: #606266;
+            font-size: 13px;
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+
+        .date-filter input[type="date"] {
+            padding: 7px 12px;
+            border: 1px solid #d9dfe6;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #303133;
+            background: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+            cursor: pointer;
+        }
+
+        .date-filter input[type="date"]:focus {
+            border-color: #2d5f8a;
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========== 报告模块 ========== */
+        .report-card {
+            background: #fff;
+            border-radius: 4px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e8ecf0;
+        }
+
+        .report-card h2 {
+            color: #303133;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e8ecf0;
+        }
+
+        .report-generate-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .report-generate-row label {
+            color: #606266;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .report-keyword-input {
+            flex: 1;
+            min-width: 160px;
+            max-width: 300px;
+            padding: 7px 12px;
+            border: 1px solid #d9dfe6;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #303133;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .report-keyword-input:focus {
+            border-color: #2d5f8a;
+        }
+
+        .report-generate-btn {
+            background: #2d5f8a;
+            color: #fff;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .report-generate-btn:hover {
+            background: #1d4a6e;
+        }
+
+        .report-generate-btn:disabled {
+            background: #a0b4c8;
+            cursor: not-allowed;
+        }
+
+        .report-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .report-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid #e8ecf0;
+            border-radius: 4px;
+            background: #fafbfc;
+            font-size: 13px;
+        }
+
+        .report-item.running {
+            border-color: #91caff;
+            background: #e6f4ff;
+        }
+
+        .report-item.failed {
+            border-color: #ffa39e;
+            background: #fff2f0;
+        }
+
+        .report-item-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .report-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .report-item-name {
+            color: #303133;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .report-item-meta {
+            color: #909399;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .report-progress-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .report-progress-bar {
+            flex: 1;
+            height: 6px;
+            background: #dce6ef;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .report-progress-inner {
+            height: 100%;
+            background: #2d5f8a;
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .report-progress-pct {
+            color: #2d5f8a;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .report-download-btn {
+            background: #fff;
+            color: #2d5f8a;
+            border: 1px solid #2d5f8a;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .report-download-btn:hover {
+            background: #2d5f8a;
+            color: #fff;
+        }
+
+        .report-delete-btn {
+            background: #fff;
+            color: #cf1322;
+            border: 1px solid #cf1322;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .report-delete-btn:hover {
+            background: #cf1322;
+            color: #fff;
+        }
+
+        .report-empty {
+            color: #909399;
+            font-size: 13px;
+            text-align: center;
+            padding: 24px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 最新话题展示 -->
+        <div class="topic-card" id="topicCard">
+            <div class="loading">加载中</div>
+        </div>
+
+	<div class="header">
+            <h1>🐟 舆情监控仪表板</h1>
+            <p class="subtitle">实时追踪热点话题，洞察舆情动态</p>
+            <button class="refresh-btn" onclick="loadAllData()">🔄 刷新数据</button>
+            <button class="config-btn" onclick="window.location.href='/monitoring/crawler-config'">⚙️ 爬虫配置</button>
+            <div class="date-filter">
+                <label for="dateSelect">日期:</label>
+                <input type="date" id="dateSelect" onchange="loadAllData()" />
+            </div>
+            <div class="keyword-filter">
+                <label for="keywordSelect">关键词筛选:</label>
+                <select id="keywordSelect" onchange="loadAllData(true)">
+                </select>
+            </div>
+        </div>
+
+        <!-- 四个指标图表 -->
+        <div class="charts-grid">
+            <!-- 1. 舆情热度趋势 -->
+            <div class="chart-card">
+                <h3>📈 舆情热度趋势</h3>
+                <div id="trendChart" class="chart-container"></div>
+            </div>
+
+            <!-- 2. 情感倾向比例 -->
+            <div class="chart-card">
+                <h3>😊 情感倾向分布</h3>
+                <div id="sentimentChart" class="chart-container"></div>
+            </div>
+
+            <!-- 3. 传播范围分析 -->
+            <div class="chart-card">
+                <h3>🗺️ 传播范围分析</h3>
+                <div id="locationChart" class="chart-container"></div>
+            </div>
+
+            <!-- 4. 传播速度分析 -->
+            <div class="chart-card">
+                <h3>⚡ 传播速度分析</h3>
+                <div id="speedChart" class="chart-container"></div>
+            </div>
+        </div>
+
+        <!-- 报告列表模块 -->
+        <div class="report-card">
+            <h2>📄 深度分析报告</h2>
+
+            <!-- 生成报告行 -->
+            <div class="report-generate-row">
+                <label for="reportKeywordInput">关键词:</label>
+                <input
+                    id="reportKeywordInput"
+                    class="report-keyword-input"
+                    type="text"
+                    placeholder="请输入分析关键词"
+                />
+                <button id="reportGenerateBtn" class="report-generate-btn" onclick="startReportGeneration()" disabled>
+                    ▶ 开始生成报告
+                </button>
+            </div>
+            <div id="reportSystemHint" style="color:#909399;font-size:12px;margin-bottom:10px;">
+                ⏳ 正在检测系统状态，请稍候...
+            </div>
+
+            <!-- 报告列表 -->
+            <div id="reportList" class="report-list">
+                <div class="report-empty">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化图表实例
+        let trendChart = echarts.init(document.getElementById('trendChart'));
+        let sentimentChart = echarts.init(document.getElementById('sentimentChart'));
+        let locationChart = echarts.init(document.getElementById('locationChart'));
+        let speedChart = echarts.init(document.getElementById('speedChart'));
+
+        // 显示加载中
+        function showLoading() {
+            trendChart.showLoading();
+            sentimentChart.showLoading();
+            locationChart.showLoading();
+            speedChart.showLoading();
+        }
+
+        // 隐藏加载中
+        function hideLoading() {
+            trendChart.hideLoading();
+            sentimentChart.hideLoading();
+            locationChart.hideLoading();
+            speedChart.hideLoading();
+        }
+
+        // 渲染话题信息
+        function renderTopicInfo(topic) {
+            const topicCard = document.getElementById('topicCard');
+
+            const keywords = topic.keywords || [];
+            const keywordsHtml = keywords.length > 0
+                ? keywords.map(kw => `<span class="keyword-tag">${kw}</span>`).join('')
+                : '<span class="keyword-tag">暂无关键词</span>';
+
+            topicCard.innerHTML = `
+                <div class="topic-name">${topic.topic_name || '暂无话题'}</div>
+                <div class="topic-desc">${topic.topic_description || '暂无描述'}</div>
+                <div class="keywords">${keywordsHtml}</div>
+                <div class="meta">
+                    提取日期: ${topic.extract_date || '未知'} | 话题ID: ${topic.topic_id || 'N/A'}
+                    <button class="topic-refresh-btn" id="dailyNewsRefreshBtn" onclick="triggerDailyNewsRefresh()">🔄 重新提取</button>
+                    <span class="topic-refresh-msg" id="dailyNewsRefreshMsg"></span>
+                </div>
+            `;
+        }
+
+        // 渲染舆情热度趋势图
+        function renderTrendChart(data) {
+            const option = {
+                title: {
+                    text: '最近6天评论数趋势',
+                    textStyle: { fontSize: 14, color: '#718096' },
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: data.dates || [],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 12
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '评论数',
+                    axisLabel: { fontSize: 12 }
+                },
+                series: [{
+                    name: '评论数',
+                    type: 'line',
+                    data: data.comment_counts || [],
+                    smooth: true,
+                    itemStyle: {
+                        color: '#2d5f8a'
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0, y: 0, x2: 0, y2: 1,
+                            colorStops: [
+                                { offset: 0, color: 'rgba(45, 95, 138, 0.25)' },
+                                { offset: 1, color: 'rgba(45, 95, 138, 0.03)' }
+                            ]
+                        }
+                    }
+                }],
+                grid: {
+                    left: '10%',
+                    right: '5%',
+                    bottom: '15%',
+                    top: '15%'
+                }
+            };
+
+            trendChart.setOption(option);
+        }
+
+        // 渲染情感分布饼图
+        function renderSentimentChart(data) {
+            const option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{a} <br/>{b}: {c} ({d}%)'
+                },
+                legend: {
+                    orient: 'vertical',
+                    left: 'left',
+                    top: 'center'
+                },
+                series: [{
+                    name: '情感分布',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: true,
+                    itemStyle: {
+                        borderRadius: 10,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: true,
+                        formatter: '{b}\n{d}%'
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            fontSize: 16,
+                            fontWeight: 'bold'
+                        }
+                    },
+                    data: [
+                        {
+                            value: data.positive || 0,
+                            name: '正向',
+                            itemStyle: { color: '#48bb78' }
+                        },
+                        {
+                            value: data.neutral || 0,
+                            name: '中性',
+                            itemStyle: { color: '#ecc94b' }
+                        },
+                        {
+                            value: data.negative || 0,
+                            name: '负面',
+                            itemStyle: { color: '#f56565' }
+                        }
+                    ]
+                }]
+            };
+
+            sentimentChart.setOption(option);
+
+            // 点击饼图扇区 → 新标签页打开评论明细
+            sentimentChart.off('click');
+            sentimentChart.on('click', function(params) {
+                const labelToSentiment = { '正向': 2, '中性': 1, '负面': 0 };
+                const s = labelToSentiment[params.name];
+                if (s === undefined) return;
+                const kw = document.getElementById('keywordSelect')?.value || '';
+                let url = `/monitoring/comments?sentiment=${s}`;
+                if (kw) url += `&keyword=${encodeURIComponent(kw)}`;
+                window.open(url, '_blank');
+            });
+        }
+
+        // 渲染地域分布柱状图
+        function renderLocationChart(data) {
+            const locations = Object.keys(data);
+            const counts = Object.values(data);
+
+            const option = {
+                title: {
+                    text: 'TOP10地域分布',
+                    textStyle: { fontSize: 14, color: '#718096' },
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: locations,
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 12
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '评论数',
+                    axisLabel: { fontSize: 12 }
+                },
+                series: [{
+                    name: '评论数',
+                    type: 'bar',
+                    data: counts,
+                    itemStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0, y: 0, x2: 0, y2: 1,
+                            colorStops: [
+                                { offset: 0, color: '#2d5f8a' },
+                                { offset: 1, color: '#5a9cbf' }
+                            ]
+                        },
+                        borderRadius: [5, 5, 0, 0]
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            color: '#1d4a6e'
+                        }
+                    }
+                }],
+                grid: {
+                    left: '10%',
+                    right: '5%',
+                    bottom: '20%',
+                    top: '15%'
+                }
+            };
+
+            locationChart.setOption(option);
+        }
+
+        // 渲染传播速度图
+        function renderSpeedChart(data) {
+            const option = {
+                title: {
+                    text: '24小时评论分布',
+                    textStyle: { fontSize: 14, color: '#718096' },
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: data.hours || [],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 10
+                    },
+                    boundaryGap: false
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '评论数',
+                    axisLabel: { fontSize: 12 }
+                },
+                series: [{
+                    name: '评论数',
+                    type: 'line',
+                    data: data.comment_counts || [],
+                    smooth: true,
+                    itemStyle: {
+                        color: '#f56565'
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0, y: 0, x2: 0, y2: 1,
+                            colorStops: [
+                                { offset: 0, color: 'rgba(245, 101, 101, 0.3)' },
+                                { offset: 1, color: 'rgba(245, 101, 101, 0.05)' }
+                            ]
+                        }
+                    }
+                }],
+                grid: {
+                    left: '10%',
+                    right: '5%',
+                    bottom: '20%',
+                    top: '15%'
+                }
+            };
+
+            speedChart.setOption(option);
+        }
+
+        // 返回今天的 CST 日期字符串 YYYY-MM-DD
+        function getTodayCST() {
+            const now = new Date();
+            const cst = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+            return cst.toISOString().slice(0, 10);
+        }
+
+        // 加载关键词列表（按当前选中日期过滤，保留当前选中关键词）
+        async function loadKeywords() {
+            try {
+                const date = document.getElementById('dateSelect').value;
+                let url = '/monitoring/api/crawler/keywords';
+                if (date) url += '?date=' + encodeURIComponent(date);
+                const response = await fetch(url);
+                const result = await response.json();
+                const select = document.getElementById('keywordSelect');
+                const currentValue = select.value;
+
+                // 清空旧选项（含 optgroup）
+                select.innerHTML = '';
+
+                if (result.success && result.data) {
+                    const crawlerKws = result.data.crawler || [];
+                    // 监控下拉中 daily 组去掉已在 crawler 组的重复项
+                    const crawlerSet = new Set(crawlerKws);
+                    const dailyKws   = (result.data.daily || []).filter(kw => !crawlerSet.has(kw));
+                    const allKws     = [...crawlerKws, ...dailyKws];
+
+                    function appendOptGroup(label, keywords) {
+                        if (keywords.length === 0) return;
+                        const group = document.createElement('optgroup');
+                        group.label = label;
+                        keywords.forEach(kw => {
+                            const opt = document.createElement('option');
+                            opt.value = kw;
+                            opt.textContent = kw;
+                            group.appendChild(opt);
+                        });
+                        select.appendChild(group);
+                    }
+
+                    appendOptGroup('爬虫配置关键词', crawlerKws);
+                    appendOptGroup('每日新闻分析', dailyKws);
+
+                    // 恢复之前的选中值（若仍在列表中）
+                    if (currentValue && allKws.includes(currentValue)) {
+                        select.value = currentValue;
+                    } else if (crawlerKws.length > 0) {
+                        // 默认选中爬虫配置第一个关键词
+                        select.value = crawlerKws[0];
+                    }
+
+                    // 将选中关键词同步到报告输入框作为默认值
+                    const reportInput = document.getElementById('reportKeywordInput');
+                    if (!reportInput.value && allKws.length > 0) {
+                        reportInput.value = select.value || allKws[0];
+                    }
+                }
+            } catch (error) {
+                console.error('加载关键词列表失败:', error);
+            }
+        }
+
+        // ===== 手动触发每日新闻提取 =====
+        let _dailyNewsRefreshTimer = null;
+
+        async function triggerDailyNewsRefresh() {
+            const btn = document.getElementById('dailyNewsRefreshBtn');
+            const msg = document.getElementById('dailyNewsRefreshMsg');
+            if (!btn) return;
+
+            btn.disabled = true;
+            btn.textContent = '⏳ 提取中...';
+            if (msg) { msg.className = 'topic-refresh-msg'; msg.textContent = '正在抓取今日新闻，请稍候...'; }
+
+            try {
+                const res = await fetch('/api/daily-news/refresh', { method: 'POST' });
+                const result = await res.json();
+                if (!result.success) {
+                    if (btn) { btn.disabled = false; btn.textContent = '🔄 重新提取'; }
+                    if (msg) { msg.className = 'topic-refresh-msg error'; msg.textContent = result.message; }
+                    return;
+                }
+            } catch (e) {
+                if (btn) { btn.disabled = false; btn.textContent = '🔄 重新提取'; }
+                if (msg) { msg.className = 'topic-refresh-msg error'; msg.textContent = '请求失败: ' + e.message; }
+                return;
+            }
+
+            // 轮询状态
+            if (_dailyNewsRefreshTimer) clearInterval(_dailyNewsRefreshTimer);
+            _dailyNewsRefreshTimer = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/daily-news/refresh/status');
+                    const result = await res.json();
+                    const btn2 = document.getElementById('dailyNewsRefreshBtn');
+                    const msg2 = document.getElementById('dailyNewsRefreshMsg');
+
+                    if (result.status === 'completed') {
+                        clearInterval(_dailyNewsRefreshTimer);
+                        _dailyNewsRefreshTimer = null;
+                        if (msg2) { msg2.className = 'topic-refresh-msg success'; msg2.textContent = result.message; }
+                        // 重新加载完整数据（含 topicCard）
+                        await loadAllData(false);
+                    } else if (result.status === 'failed') {
+                        clearInterval(_dailyNewsRefreshTimer);
+                        _dailyNewsRefreshTimer = null;
+                        if (btn2) { btn2.disabled = false; btn2.textContent = '🔄 重新提取'; }
+                        if (msg2) { msg2.className = 'topic-refresh-msg error'; msg2.textContent = result.message; }
+                    }
+                    // running: 继续轮询
+                } catch (e) {
+                    clearInterval(_dailyNewsRefreshTimer);
+                    _dailyNewsRefreshTimer = null;
+                    const btn2 = document.getElementById('dailyNewsRefreshBtn');
+                    if (btn2) { btn2.disabled = false; btn2.textContent = '🔄 重新提取'; }
+                }
+            }, 2000);
+        }
+
+        // 加载所有数据（先刷新关键词下拉，再拉图表数据，保证联动）
+        async function loadAllData(skipTopic = false) {
+            showLoading();
+            await loadKeywords();
+
+            try {
+                const keyword = document.getElementById('keywordSelect').value;
+                const date = document.getElementById('dateSelect').value;
+                let url = '/monitoring/api/all-data?days=6';
+                if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
+                if (date)    url += '&date='    + encodeURIComponent(date);
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    const { topic, trend, sentiment, location, speed } = result.data;
+
+                    // 渲染话题信息（切换关键词时跳过，避免覆盖每日新闻分析）
+                    if (!skipTopic) {
+                        renderTopicInfo(topic);
+                    }
+
+                    // 渲染图表
+                    renderTrendChart(trend);
+                    renderSentimentChart(sentiment);
+                    renderLocationChart(location);
+                    renderSpeedChart(speed);
+                } else {
+                    showError(result.message || '数据加载失败');
+                }
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                showError('网络错误，请稍后重试');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const topicCard = document.getElementById('topicCard');
+            topicCard.innerHTML = `
+                <div class="error-message">
+                    ❌ ${message}
+                </div>
+            `;
+        }
+
+        // 窗口大小改变时重新调整图表
+        window.addEventListener('resize', () => {
+            trendChart.resize();
+            sentimentChart.resize();
+            locationChart.resize();
+            speedChart.resize();
+        });
+
+        // 页面加载完成后自动加载数据
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化日期为今天（北京时间）
+            document.getElementById('dateSelect').value = getTodayCST();
+            // loadAllData 内部会先调用 loadKeywords，无需单独调用
+            loadAllData();
+            loadReports();
+            initSystemStatus();  // 自动检测并启动系统
+        });
+
+        // ========== 报告模块 ==========
+
+        let _reportPollingTimer = null;   // 报告进度轮询定时器
+        let _systemStatusTimer = null;    // 系统状态轮询定时器
+        let _runningTaskIds = new Set();  // 正在运行的报告任务ID
+        let _systemStarted = false;       // 系统是否已启动
+        let _systemStarting = false;      // 系统是否正在启动中
+
+        // 当关键词筛选变化时，同步到报告关键词输入框
+        document.getElementById('keywordSelect').addEventListener('change', function() {
+            const kw = this.value;
+            if (kw) {
+                document.getElementById('reportKeywordInput').value = kw;
+            }
+        });
+
+        // ---- 系统状态管理 ----
+
+        /**
+         * 页面打开时自动检测系统状态：
+         *  - 已启动 → 直接解锁按钮
+         *  - 正在启动（来自其他请求）→ 轮询直到完成
+         *  - 未启动 → 自动调用 /api/system/start 启动
+         */
+        async function initSystemStatus() {
+            try {
+                const res = await fetch('/api/system/status');
+                const result = await res.json();
+
+                if (result.started) {
+                    _systemStarted = true;
+                    _systemStarting = false;
+                    updateGenerateButton();
+                    return;
+                }
+
+                if (result.starting) {
+                    // 其它请求已在启动中，轮询等待
+                    _systemStarted = false;
+                    _systemStarting = true;
+                    updateGenerateButton();
+                    startSystemStatusPolling();
+                    return;
+                }
+
+                // 未启动也未在启动 → 自动触发
+                _systemStarted = false;
+                _systemStarting = true;
+                updateGenerateButton();
+                triggerSystemStart();
+
+            } catch (e) {
+                console.error('检测系统状态失败:', e);
+                _systemStarting = false;
+                setSystemHint('⚠ 无法连接到服务器，请刷新页面重试', '#cf1322');
+                updateGenerateButton();
+            }
+        }
+
+        /** 调用 /api/system/start，等待响应后更新状态 */
+        async function triggerSystemStart() {
+            try {
+                const res = await fetch('/api/system/start', { method: 'POST' });
+                const result = await res.json();
+
+                if (result.success) {
+                    _systemStarted = true;
+                    _systemStarting = false;
+                } else if (result.message === '系统已启动') {
+                    // 并发：另一个请求先完成了
+                    _systemStarted = true;
+                    _systemStarting = false;
+                } else if (result.message === '系统正在启动') {
+                    // 并发：另一个请求正在进行，轮询
+                    startSystemStatusPolling();
+                    return;
+                } else {
+                    // 真正失败（配置缺失等）
+                    _systemStarting = false;
+                    setSystemHint(`⚠ 系统启动失败: ${result.message || '未知错误'}`, '#cf1322');
+                }
+            } catch (e) {
+                _systemStarting = false;
+                setSystemHint(`⚠ 启动请求失败: ${e.message}`, '#cf1322');
+            }
+            updateGenerateButton();
+        }
+
+        /** 轮询 /api/system/status，直到 started 或不再 starting */
+        function startSystemStatusPolling() {
+            if (_systemStatusTimer) return;
+            _systemStatusTimer = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/system/status');
+                    const result = await res.json();
+                    _systemStarted = result.started === true;
+                    _systemStarting = result.starting === true;
+                } catch (e) { /* 保持当前状态 */ }
+
+                updateGenerateButton();
+
+                if (_systemStarted || !_systemStarting) {
+                    clearInterval(_systemStatusTimer);
+                    _systemStatusTimer = null;
+                }
+            }, 3000);
+        }
+
+        function setSystemHint(text, color) {
+            const hint = document.getElementById('reportSystemHint');
+            if (!hint) return;
+            hint.textContent = text;
+            hint.style.color = color || '#909399';
+            hint.style.display = '';
+        }
+
+        function updateGenerateButton() {
+            const btn = document.getElementById('reportGenerateBtn');
+            const hint = document.getElementById('reportSystemHint');
+
+            if (_runningTaskIds.size > 0) {
+                btn.disabled = true;
+                btn.textContent = '⏳ 生成中...';
+                btn.title = '';
+                if (hint) hint.style.display = 'none';
+            } else if (_systemStarted) {
+                btn.disabled = false;
+                btn.textContent = '▶ 开始生成报告';
+                btn.title = '';
+                if (hint) hint.style.display = 'none';
+            } else if (_systemStarting) {
+                btn.disabled = true;
+                btn.textContent = '⏳ 系统启动中...';
+                btn.title = '';
+                // 只在 hint 没有错误信息时才显示启动提示
+                if (hint && !hint.textContent.startsWith('⚠')) {
+                    hint.textContent = '正在自动启动 Insight / Media / Query Engine，请稍候...';
+                    hint.style.color = '#909399';
+                    hint.style.display = '';
+                }
+            } else {
+                btn.disabled = true;
+                btn.textContent = '▶ 开始生成报告';
+                btn.title = '系统未启动';
+                // hint 已由 setSystemHint 设置错误信息，不覆盖
+            }
+        }
+
+        // 加载报告列表
+        async function loadReports() {
+            try {
+                const res = await fetch('/api/reports');
+                const result = await res.json();
+                if (!result.success) return;
+
+                const { tasks, history } = result.data;
+
+                // 合并：任务在前，历史文件在后（历史文件已经按时间排序）
+                renderReportList(tasks, history);
+
+                // 如果有正在运行的任务，启动轮询
+                const running = tasks.filter(t => t.status === 'running');
+                if (running.length > 0) {
+                    running.forEach(t => _runningTaskIds.add(t.task_id));
+                    startReportPolling();
+                }
+                updateGenerateButton();
+            } catch (e) {
+                console.error('加载报告列表失败:', e);
+            }
+        }
+
+        // 渲染报告列表
+        function renderReportList(tasks, history) {
+            const container = document.getElementById('reportList');
+
+            const items = [];
+
+            // 任务条目（运行中 / 失败 / 完成但尚未进入history）
+            tasks.forEach(task => {
+                items.push(buildTaskItem(task));
+            });
+
+            // 历史文件（已完成的任务对应的文件已经包含在 history 中）
+            // 去重：如果 history 中的文件名已经被某个任务覆盖，则不再显示
+            const taskFilenames = new Set(tasks.filter(t => t.filename).map(t => t.filename));
+            history.forEach(report => {
+                if (!taskFilenames.has(report.filename)) {
+                    items.push(buildHistoryItem(report));
+                }
+            });
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="report-empty">暂无报告，点击上方按钮生成首份报告</div>';
+                return;
+            }
+
+            container.innerHTML = items.join('');
+        }
+
+        function buildTaskItem(task) {
+            const isRunning = task.status === 'running';
+            const isFailed = task.status === 'failed';
+            const isCompleted = task.status === 'completed';
+
+            let icon = isRunning ? '⏳' : isFailed ? '❌' : '✅';
+            let statusClass = isRunning ? 'running' : isFailed ? 'failed' : '';
+
+            let progressHtml = '';
+            if (isRunning) {
+                progressHtml = `
+                    <div class="report-progress-wrap">
+                        <div class="report-progress-bar">
+                            <div class="report-progress-inner" style="width:${task.progress}%"></div>
+                        </div>
+                        <span class="report-progress-pct">${task.progress}%</span>
+                    </div>`;
+            }
+
+            let metaText = `关键词: ${escHtml(task.keyword)} &nbsp;|&nbsp; ${escHtml(task.created_at)}`;
+            if (isFailed && task.error) {
+                metaText += ` &nbsp;|&nbsp; <span style="color:#cf1322">错误: ${escHtml(task.error.slice(0,80))}</span>`;
+            }
+
+            let downloadBtn = '';
+            if (isCompleted && task.filename) {
+                downloadBtn = `
+                    <a class="report-download-btn" href="/api/reports/download/${encodeURIComponent(task.filename)}" download>下载</a>
+                    <button class="report-delete-btn" onclick="deleteReport('${escHtml(task.filename)}')">删除</button>`;
+            }
+
+            let displayName = isCompleted && task.filename ? escHtml(task.filename) : `正在生成: ${escHtml(task.keyword)} 的报告`;
+
+            return `
+                <div class="report-item ${statusClass}" id="task-${task.task_id}">
+                    <span class="report-item-icon">${icon}</span>
+                    <div class="report-item-info">
+                        <div class="report-item-name">${displayName}</div>
+                        <div class="report-item-meta">${metaText}</div>
+                        ${progressHtml}
+                    </div>
+                    ${downloadBtn}
+                </div>`;
+        }
+
+        function buildHistoryItem(report) {
+            return `
+                <div class="report-item" id="hist-${escHtml(report.filename)}">
+                    <span class="report-item-icon">📋</span>
+                    <div class="report-item-info">
+                        <div class="report-item-name">${escHtml(report.filename)}</div>
+                        <div class="report-item-meta">${escHtml(report.created_at)}</div>
+                    </div>
+                    <a class="report-download-btn" href="/api/reports/download/${encodeURIComponent(report.filename)}" download>下载</a>
+                    <button class="report-delete-btn" onclick="deleteReport('${escHtml(report.filename)}')">删除</button>
+                </div>`;
+        }
+
+        function escHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // 删除报告
+        async function deleteReport(filename) {
+            if (!confirm(`确认删除报告文件：\n${filename}`)) return;
+            try {
+                const res = await fetch(`/api/reports/delete/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (!result.success) {
+                    alert('删除失败: ' + result.message);
+                    return;
+                }
+                await loadReports();
+            } catch (e) {
+                alert('删除请求失败: ' + e.message);
+            }
+        }
+
+        // 开始生成报告
+        async function startReportGeneration() {
+            const input = document.getElementById('reportKeywordInput');
+            const keyword = input.value.trim();
+            if (!keyword) {
+                input.focus();
+                return;
+            }
+
+            const btn = document.getElementById('reportGenerateBtn');
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+
+            try {
+                const res = await fetch('/api/reports/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyword })
+                });
+                const result = await res.json();
+                if (!result.success) {
+                    alert('启动失败: ' + result.message);
+                    return;
+                }
+
+                _runningTaskIds.add(result.task_id);
+                startReportPolling();
+                await loadReports();
+            } catch (e) {
+                alert('请求失败: ' + e.message);
+            } finally {
+                updateGenerateButton();
+            }
+        }
+
+        // 轮询进度
+        function startReportPolling() {
+            if (_reportPollingTimer) return; // 已在轮询
+            _reportPollingTimer = setInterval(async () => {
+                if (_runningTaskIds.size === 0) {
+                    clearInterval(_reportPollingTimer);
+                    _reportPollingTimer = null;
+                    return;
+                }
+
+                const finished = [];
+                for (const taskId of _runningTaskIds) {
+                    try {
+                        const res = await fetch(`/api/reports/progress/${taskId}`);
+                        const result = await res.json();
+                        if (!result.success) continue;
+                        const task = result.data;
+
+                        // 更新进度条（如果条目已在DOM中）
+                        updateTaskItemInDom(task);
+
+                        if (task.status !== 'running') {
+                            finished.push(taskId);
+                        }
+                    } catch (e) {
+                        console.error('查询进度失败:', e);
+                    }
+                }
+
+                finished.forEach(id => _runningTaskIds.delete(id));
+                if (finished.length > 0) {
+                    updateGenerateButton();
+                    await loadReports();
+                }
+            }, 2000);
+        }
+
+        // 就地更新任务DOM（避免整个列表闪烁）
+        function updateTaskItemInDom(task) {
+            const el = document.getElementById(`task-${task.task_id}`);
+            if (!el) return;
+            // 只更新进度条
+            const bar = el.querySelector('.report-progress-inner');
+            const pct = el.querySelector('.report-progress-pct');
+            if (bar) bar.style.width = task.progress + '%';
+            if (pct) pct.textContent = task.progress + '%';
+        }
+    </script>
+</body>
+</html>

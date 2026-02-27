@@ -433,7 +433,8 @@ class MonitoringService:
         """
         返回分组关键词：
           crawler: 爬虫配置中的关键词（来自 crawler_configs.json，保序去重）
-          daily:   每日新闻分析关键词（来自 daily_topics，已排除 crawler 中已有的）
+          daily:   每日新闻分析关键词（来自 daily_topics，不排除已配置的关键词，
+                   同一关键词可配置到多个平台）
         爬虫配置页标签只展示 daily；监控仪表板下拉展示两组。
         """
         # ① 爬虫配置关键词（保持配置顺序，去重）
@@ -451,7 +452,7 @@ class MonitoringService:
         except Exception as e:
             logger.debug(f"get_keywords crawler_configs failed: {e}")
 
-        # ② 每日新闻分析关键词（来自 daily_topics，保持原始顺序，去掉已在 crawler 中的）
+        # ② 每日新闻分析关键词（来自 daily_topics，保持原始顺序）
         daily_kws: list = []
         daily_kws_seen: set = set()
         try:
@@ -486,10 +487,9 @@ class MonitoringService:
             logger.warning(f"get_keywords daily_topics 失败: {exc}")
             _reset_engine()
 
-        daily_only = [k for k in daily_kws if k not in seen_crawler][:100]
         return {
             "crawler": crawler_kws,
-            "daily":   daily_only,
+            "daily":   daily_kws[:100],
         }
 
     def get_comment_list(self, sentiment: int | None, keyword: str | None,
