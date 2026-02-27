@@ -14,7 +14,8 @@ import subprocess
 import time
 import threading
 import json
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta, timezone
 from queue import Queue
 from flask import Flask, render_template, request, jsonify, Response
 from flask_socketio import SocketIO, emit
@@ -37,6 +38,14 @@ try:
 except ImportError as e:
     logger.error(f"ReportEngine导入失败: {e}")
     REPORT_ENGINE_AVAILABLE = False
+
+# 导入监控仪表板Blueprint
+try:
+    from monitoring_dashboard import monitoring_bp
+    MONITORING_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"监控仪表板导入失败: {e}")
+    MONITORING_AVAILABLE = False
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'Dedicated-to-creating-a-concise-and-versatile-public-opinion-analysis-platform'
@@ -81,6 +90,13 @@ if REPORT_ENGINE_AVAILABLE:
     logger.info("ReportEngine接口已注册")
 else:
     logger.info("ReportEngine不可用，跳过接口注册")
+
+# 注册监控仪表板Blueprint
+if MONITORING_AVAILABLE:
+    app.register_blueprint(monitoring_bp)
+    logger.info("监控仪表板已注册，访问 /monitoring/")
+else:
+    logger.warning("监控仪表板不可用，跳过注册")
 
 # 创建日志目录
 LOG_DIR = Path('logs')
@@ -1583,6 +1599,186 @@ def _format_node_tooltip(node) -> str:
 
 # ==================== GraphRAG API 端点结束 ====================
 
+# ==================== 报告生成 API ====================
+
+REPORTS_DIR = Path('insight_engine_streamlit_reports')
+
+_report_tasks: dict = {}
+_report_tasks_lock = threading.Lock()
+
+def _get_reports_list():
+    """扫描报告目录，返回已完成的报告列表（按修改时间由近及远）"""
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    reports = []
+    for md_file in REPORTS_DIR.glob('deep_search_report_*.md'):
+        stat = md_file.stat()
+        reports.append({
+            'filename': md_file.name,
+            'size': stat.st_size,
+            'created_at': datetime.fromtimestamp(stat.st_mtime, tz=timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S'),
+            'created_ts': stat.st_mtime,
+        })
+    reports.sort(key=lambda x: x['created_ts'], reverse=True)
+    for r in reports:
+        del r['created_ts']
+    return reports
+
+
+def _run_report_generation(task_id: str, keyword: str):
+    """在后台线程中运行报告生成（仅在系统已启动后才会被调度）"""
+    def _update(progress: int, status: str = 'running', filename: str = '', error: str = ''):
+        with _report_tasks_lock:
+            if task_id in _report_tasks:
+                _report_tasks[task_id].update({
+                    'progress': progress,
+                    'status': status,
+                    'filename': filename,
+                    'error': error,
+                })
+
+    try:
+        _update(0)
+        from InsightEngine import DeepSearchAgent, Settings
+        from config import reload_settings, settings as app_settings
+        reload_settings()  # 确保使用保存并启动后写入的最新配置
+
+        config = Settings(
+            INSIGHT_ENGINE_API_KEY=app_settings.INSIGHT_ENGINE_API_KEY,
+            INSIGHT_ENGINE_BASE_URL=app_settings.INSIGHT_ENGINE_BASE_URL,
+            INSIGHT_ENGINE_MODEL_NAME=app_settings.INSIGHT_ENGINE_MODEL_NAME or "kimi-k2-0711-preview",
+            DB_HOST=app_settings.DB_HOST,
+            DB_USER=app_settings.DB_USER,
+            DB_PASSWORD=app_settings.DB_PASSWORD,
+            DB_NAME=app_settings.DB_NAME,
+            DB_PORT=app_settings.DB_PORT,
+            DB_CHARSET=app_settings.DB_CHARSET,
+            DB_DIALECT=app_settings.DB_DIALECT,
+            MAX_REFLECTIONS=2,
+            MAX_CONTENT_LENGTH=500000,
+            OUTPUT_DIR=str(REPORTS_DIR),
+        )
+
+        _update(5)
+        agent = DeepSearchAgent(config)
+        _update(10)
+        agent._generate_report_structure(keyword)
+
+        total_paragraphs = len(agent.state.paragraphs)
+        for i in range(total_paragraphs):
+            agent._initial_search_and_summary(i)
+            progress = int(20 + (i + 0.5) / max(total_paragraphs, 1) * 60)
+            _update(progress)
+            agent._reflection_loop(i)
+            agent.state.paragraphs[i].research.mark_completed()
+            progress = int(20 + (i + 1) / max(total_paragraphs, 1) * 60)
+            _update(progress)
+
+        _update(85)
+        final_report = agent._generate_final_report()
+        _update(95)
+        agent._save_report(final_report)
+
+        latest_file = max(
+            REPORTS_DIR.glob('deep_search_report_*.md'),
+            key=lambda p: p.stat().st_mtime,
+            default=None,
+        )
+        filename = latest_file.name if latest_file else ''
+        _update(100, status='completed', filename=filename)
+
+    except Exception as exc:
+        logger.exception(f"报告生成失败: task_id={task_id}")
+        _update(0, status='failed', error=str(exc))
+
+
+@app.route('/api/reports')
+def list_reports():
+    try:
+        history = _get_reports_list()
+        with _report_tasks_lock:
+            tasks = list(_report_tasks.values())
+        tasks.sort(key=lambda t: t['created_at'], reverse=True)
+        return jsonify({'success': True, 'data': {'tasks': tasks, 'history': history}})
+    except Exception as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/reports/generate', methods=['POST'])
+def generate_report():
+    """启动报告生成任务——要求系统已通过「保存并启动」完成初始化"""
+    state = _get_system_state()
+    if not state['started']:
+        return jsonify({
+            'success': False,
+            'message': '请先在主页面点击「保存并启动系统」，等待三个 Engine 启动完成后再生成报告'
+        }), 400
+
+    try:
+        data = request.get_json() or {}
+        keyword = (data.get('keyword') or '').strip()
+        if not keyword:
+            return jsonify({'success': False, 'message': '请提供关键词'}), 400
+
+        import uuid
+        task_id = str(uuid.uuid4())
+        now = datetime.now(tz=timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
+        with _report_tasks_lock:
+            _report_tasks[task_id] = {
+                'task_id': task_id,
+                'keyword': keyword,
+                'status': 'running',
+                'progress': 0,
+                'filename': '',
+                'error': '',
+                'created_at': now,
+            }
+
+        t = threading.Thread(target=_run_report_generation, args=(task_id, keyword), daemon=True)
+        t.start()
+        return jsonify({'success': True, 'task_id': task_id})
+    except Exception as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/reports/progress/<task_id>')
+def get_report_progress(task_id):
+    with _report_tasks_lock:
+        task = _report_tasks.get(task_id)
+    if task is None:
+        return jsonify({'success': False, 'message': '任务不存在'}), 404
+    return jsonify({'success': True, 'data': task})
+
+
+@app.route('/api/reports/download/<filename>')
+def download_report(filename):
+    from flask import send_file as _send_file
+    try:
+        if not filename.endswith('.md') or '/' in filename or '\\' in filename or '..' in filename:
+            return jsonify({'success': False, 'message': '非法文件名'}), 400
+        filepath = REPORTS_DIR / filename
+        if not filepath.exists():
+            return jsonify({'success': False, 'message': '文件不存在'}), 404
+        return _send_file(str(filepath), as_attachment=True, download_name=filename, mimetype='text/markdown')
+    except Exception as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/reports/delete/<filename>', methods=['DELETE'])
+def delete_report(filename):
+    try:
+        if not filename.endswith('.md') or '/' in filename or '\\' in filename or '..' in filename:
+            return jsonify({'success': False, 'message': '非法文件名'}), 400
+        filepath = REPORTS_DIR / filename
+        if not filepath.exists():
+            return jsonify({'success': False, 'message': '文件不存在'}), 404
+        filepath.unlink()
+        logger.info(f"报告文件已删除: {filename}")
+        return jsonify({'success': True, 'message': f'{filename} 已删除'})
+    except Exception as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+# ==================== 报告生成 API 结束 ====================
+
 @socketio.on('connect')
 def handle_connect():
     """客户端连接"""
@@ -1599,6 +1795,113 @@ def handle_status_request():
         }
         for app_name, info in processes.items()
     })
+
+def _run_daily_news_extraction():
+    """执行每日新闻提取（同步包装异步函数）"""
+    try:
+        logger.info("[DailyNews] 开始每日新闻提取...")
+        from MindSpider.BroadTopicExtraction.main import BroadTopicExtraction
+
+        async def _do():
+            async with BroadTopicExtraction() as extractor:
+                return await extractor.run_daily_extraction()
+
+        result = asyncio.run(_do())
+        if result.get('success'):
+            news_count = result.get('news_collection', {}).get('total_news', 0)
+            kw_count = len(result.get('topic_extraction', {}).get('keywords', []))
+            logger.info(f"[DailyNews] 提取完成：新闻 {news_count} 条，关键词 {kw_count} 个")
+        else:
+            logger.error(f"[DailyNews] 提取失败：{result.get('error')}")
+        return result
+    except Exception as exc:
+        logger.exception(f"[DailyNews] 提取异常：{exc}")
+        return {"success": False, "error": str(exc)}
+
+
+# ===== 手动触发每日新闻提取的任务状态 =====
+_daily_news_manual_task: dict = {"status": "idle", "message": ""}
+_daily_news_manual_lock = threading.Lock()
+
+
+@app.route('/api/daily-news/refresh', methods=['POST'])
+def trigger_daily_news_refresh():
+    """手动触发一次每日新闻提取，后台异步执行"""
+    with _daily_news_manual_lock:
+        if _daily_news_manual_task["status"] == "running":
+            return jsonify({"success": False, "message": "提取任务正在进行中，请稍候"}), 400
+        _daily_news_manual_task["status"] = "running"
+        _daily_news_manual_task["message"] = "正在提取..."
+
+    def _run():
+        result = _run_daily_news_extraction()
+        with _daily_news_manual_lock:
+            if result and result.get("success"):
+                news_count = result.get("news_collection", {}).get("total_news", 0)
+                kw_count = len(result.get("topic_extraction", {}).get("keywords", []))
+                _daily_news_manual_task["status"] = "completed"
+                _daily_news_manual_task["message"] = f"提取完成：新闻 {news_count} 条，关键词 {kw_count} 个"
+            else:
+                error = (result or {}).get("error", "未知错误")
+                _daily_news_manual_task["status"] = "failed"
+                _daily_news_manual_task["message"] = f"提取失败：{error}"
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"success": True, "message": "提取任务已启动"})
+
+
+@app.route('/api/daily-news/refresh/status')
+def daily_news_refresh_status():
+    """查询手动触发的每日新闻提取任务状态"""
+    with _daily_news_manual_lock:
+        return jsonify({
+            "success": True,
+            "status": _daily_news_manual_task["status"],
+            "message": _daily_news_manual_task["message"],
+        })
+
+
+def _daily_news_scheduler():
+    """
+    后台线程：每天北京时间 09:00 自动执行一次每日新闻提取。
+    启动时若当天还没有数据（或已过 09:00 且未执行），立即补跑一次。
+    """
+    CST = timezone(timedelta(hours=8))
+
+    def _today_has_data():
+        """检查数据库里今天（北京时间）是否已有新闻数据"""
+        try:
+            from MindSpider.BroadTopicExtraction.database_manager import DatabaseManager
+            dm = DatabaseManager()
+            result = dm.get_daily_topics(datetime.now(CST).date())
+            dm.close()
+            return result is not None
+        except Exception:
+            return False
+
+    # 启动时检查：若今天 09:00 已过且数据库没有今天的数据，立即补跑
+    now = datetime.now(CST)
+    target_today = now.replace(hour=9, minute=0, second=0, microsecond=0)
+    if now >= target_today and not _today_has_data():
+        logger.info("[DailyNews] 启动时发现今日数据缺失，立即补跑...")
+        _run_daily_news_extraction()
+
+    while True:
+        now = datetime.now(CST)
+        # 计算距离下一个 09:00 的秒数
+        next_run = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        if now >= next_run:
+            next_run += timedelta(days=1)
+        wait_seconds = (next_run - now).total_seconds()
+        logger.info(f"[DailyNews] 下次执行时间：{next_run.strftime('%Y-%m-%d %H:%M:%S')} CST（{wait_seconds/3600:.1f} 小时后）")
+        time.sleep(wait_seconds)
+        _run_daily_news_extraction()
+
+
+# 启动每日新闻调度线程
+_daily_news_thread = threading.Thread(target=_daily_news_scheduler, daemon=True, name="daily-news-scheduler")
+_daily_news_thread.start()
+
 
 if __name__ == '__main__':
     # 从配置文件读取 HOST 和 PORT

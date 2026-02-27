@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爬虫配置</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #fff;
+            border-radius: 4px;
+            padding: 16px 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e8ecf0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #303133;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            background: #fff;
+            color: #606266;
+            padding: 7px 16px;
+            border-radius: 4px;
+            border: 1px solid #d9dfe6;
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            border-color: #2d5f8a;
+            color: #2d5f8a;
+            transform: none;
+        }
+
+        .config-card {
+            background: #fff;
+            border-radius: 4px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e8ecf0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #303133;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-group .hint {
+            color: #909399;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        /* 关键词标签 */
+        .keywords-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+            max-height: none;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            position: relative;
+        }
+
+        .keywords-container.collapsed {
+            max-height: 120px;
+        }
+
+
+        .toggle-keywords-btn {
+            background: none;
+            border: none;
+            color: #2d5f8a;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 4px 0;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+
+        .toggle-keywords-btn:hover {
+            color: #1d4a6e;
+            text-decoration: underline;
+        }
+
+        .keyword-tag {
+            background: #f5f7fa;
+            color: #606266;
+            padding: 5px 12px;
+            border-radius: 3px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #e8ecf0;
+        }
+
+        .keyword-tag:hover {
+            background: #e8f0f7;
+            border-color: #b8d4ec;
+        }
+
+        .keyword-tag.selected {
+            background: #2d5f8a;
+            color: #fff;
+            border-color: #2d5f8a;
+        }
+
+        .keyword-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9dfe6;
+            border-radius: 4px;
+            font-size: 13px;
+            transition: border-color 0.2s;
+        }
+
+        .keyword-input:focus {
+            outline: none;
+            border-color: #2d5f8a;
+            box-shadow: 0 0 0 2px rgba(45,95,138,0.1);
+        }
+
+        /* 平台选择 */
+        .platforms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+        }
+
+        .platform-item {
+            background: #f5f7fa;
+            border: 1px solid #e8ecf0;
+            border-radius: 4px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .platform-item:hover {
+            background: #e8f0f7;
+            border-color: #b8d4ec;
+        }
+
+        .platform-item.selected {
+            background: #e8f0f7;
+            color: #2d5f8a;
+            border-color: #2d5f8a;
+        }
+
+        .platform-icon {
+            font-size: 28px;
+            margin-bottom: 4px;
+        }
+
+        .platform-name {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* 下拉框 */
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9dfe6;
+            border-radius: 4px;
+            font-size: 13px;
+            background: #fff;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #2d5f8a;
+        }
+
+        /* 按钮 */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2d5f8a;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #1d4a6e;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #fff;
+            color: #606266;
+            border: 1px solid #d9dfe6;
+        }
+
+        .btn-secondary:hover {
+            border-color: #2d5f8a;
+            color: #2d5f8a;
+        }
+
+        /* 配置列表 */
+        .config-list {
+            margin-top: 16px;
+        }
+
+        .config-item {
+            background: #f5f7fa;
+            border-radius: 4px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 3px solid #2d5f8a;
+            border-top: 1px solid #e8ecf0;
+            border-right: 1px solid #e8ecf0;
+            border-bottom: 1px solid #e8ecf0;
+        }
+
+        .config-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .config-item-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #303133;
+        }
+
+        .delete-btn {
+            background: #fff;
+            color: #ff4d4f;
+            border: 1px solid #ffccc7;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .delete-btn:hover {
+            background: #ff4d4f;
+            color: #fff;
+            border-color: #ff4d4f;
+        }
+
+        .config-item-details {
+            color: #909399;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .status-running {
+            background: #e6f7ff;
+            color: #1890ff;
+            border: 1px solid #91d5ff;
+        }
+
+        .status-completed {
+            background: #f6ffed;
+            color: #52c41a;
+            border: 1px solid #b7eb8f;
+        }
+
+        .status-failed {
+            background: #fff2f0;
+            color: #ff4d4f;
+            border: 1px solid #ffccc7;
+        }
+
+        .status-pending {
+            background: #fff7e6;
+            color: #d48806;
+            border: 1px solid #ffe58f;
+        }
+
+        /* Cookie配置 */
+        .cookie-section {
+            margin-top: 8px;
+        }
+
+        .cookie-platform-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .cookie-tab {
+            padding: 5px 12px;
+            border: 1px solid #d9dfe6;
+            border-radius: 4px;
+            background: #f5f7fa;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .cookie-tab:hover {
+            background: #e8f0f7;
+            border-color: #b8d4ec;
+        }
+
+        .cookie-tab.active {
+            background: #2d5f8a;
+            color: #fff;
+            border-color: #2d5f8a;
+        }
+
+        .cookie-tab .cookie-status {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-left: 4px;
+        }
+
+        .cookie-status.configured {
+            background: #52c41a;
+        }
+
+        .cookie-status.empty {
+            background: #ff4d4f;
+        }
+
+        .cookie-textarea {
+            width: 100%;
+            min-height: 70px;
+            padding: 8px 10px;
+            border: 1px solid #d9dfe6;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: "SF Mono", "Consolas", monospace;
+            resize: vertical;
+            transition: border-color 0.2s;
+        }
+
+        .cookie-textarea:focus {
+            outline: none;
+            border-color: #2d5f8a;
+            box-shadow: 0 0 0 2px rgba(45,95,138,0.1);
+        }
+
+        .cookie-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            align-items: center;
+        }
+
+        .btn-small {
+            padding: 5px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-save-cookie {
+            background: #2d5f8a;
+            color: #fff;
+        }
+
+        .btn-save-cookie:hover {
+            background: #1d4a6e;
+        }
+
+        .cookie-save-status {
+            font-size: 12px;
+            color: #909399;
+        }
+
+        .keyword-date-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .keyword-date-bar label {
+            font-size: 13px;
+            color: #606266;
+            font-weight: normal;
+            margin-bottom: 0;
+            white-space: nowrap;
+        }
+
+        .keyword-date-bar input[type="date"] {
+            padding: 5px 10px;
+            border: 1px solid #d9dfe6;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #303133;
+            background: #fff;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .keyword-date-bar input[type="date"]:focus {
+            border-color: #2d5f8a;
+        }
+
+        .keyword-date-bar .kw-count {
+            font-size: 12px;
+            color: #909399;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 16px;
+            color: #909399;
+            font-size: 13px;
+        }
+
+        .message {
+            padding: 10px 16px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .message-success {
+            background: #f6ffed;
+            color: #389e0d;
+            border: 1px solid #b7eb8f;
+        }
+
+        .message-error {
+            background: #fff2f0;
+            color: #cf1322;
+            border: 1px solid #ffccc7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 页面标题 -->
+        <div class="header">
+            <h1>🕷️ 爬虫配置</h1>
+            <a href="/monitoring/" class="back-btn">← 返回仪表板</a>
+        </div>
+
+        <!-- 配置表单 -->
+        <div class="config-card">
+            <h2 style="margin-bottom: 25px; color: #2d3748;">新建爬虫任务</h2>
+
+            <!-- 1. 关键词配置 -->
+            <div class="form-group">
+                <label>
+                    📝 关键词配置
+                    <span style="color: #e53e3e;">*</span>
+                </label>
+                <!-- 日期筛选：控制下方关键词标签的来源日期 -->
+                <div class="keyword-date-bar">
+                    <label for="keywordDateInput">关键词日期:</label>
+                    <input type="date" id="keywordDateInput" onchange="onKeywordDateChange()" />
+                    <span id="kwCountLabel" class="kw-count"></span>
+                </div>
+                <div id="keywordTags" class="keywords-container collapsed"></div>
+                <button id="toggleKeywordsBtn" class="toggle-keywords-btn" onclick="toggleKeywords()">
+                    <span id="toggleKeywordsIcon">▼</span>
+                    <span id="toggleKeywordsText">展开更多</span>
+                </button>
+                <input
+                    type="text"
+                    id="manualKeywords"
+                    class="keyword-input"
+                    placeholder="手动输入关键词（用逗号或空格分隔，最多10个）"
+                />
+                <div class="hint">💡 选择日期可查看对应日期的热点关键词标签，也可手动输入自定义关键词</div>
+            </div>
+
+            <!-- 2. 平台选择 -->
+            <div class="form-group">
+                <label>
+                    🌐 抓取平台
+                    <span style="color: #e53e3e;">*</span>
+                </label>
+                <div id="platformsGrid" class="platforms-grid"></div>
+                <div class="hint">💡 可以同时选择多个平台进行爬取</div>
+            </div>
+
+            <!-- 3. Cookie配置 -->
+            <div class="form-group">
+                <label>🍪 平台Cookie配置</label>
+                <div class="cookie-section">
+                    <div id="cookiePlatformTabs" class="cookie-platform-tabs"></div>
+                    <textarea id="cookieInput" class="cookie-textarea"
+                        placeholder="从浏览器开发者工具(F12)中复制Cookie字符串粘贴到此处&#10;格式: name1=value1; name2=value2; ..."></textarea>
+                    <div class="cookie-actions">
+                        <button class="btn-small btn-save-cookie" onclick="saveCookie()">保存Cookie</button>
+                        <span id="cookieSaveStatus" class="cookie-save-status"></span>
+                    </div>
+                </div>
+                <div class="hint">💡 在Windows浏览器登录各平台后，F12打开开发者工具 → Network → 点击任意请求 → 复制Cookie请求头的值。首次配置后会自动保存登录状态</div>
+            </div>
+
+            <!-- 4. 执行计划 -->
+            <div class="form-group">
+                <label>
+                    ⏰ 执行计划
+                    <span style="color: #e53e3e;">*</span>
+                </label>
+                <select id="intervalSelect">
+                    <option value="5min">每隔 5 分钟</option>
+                    <option value="10min">每隔 10 分钟</option>
+                    <option value="30min">每隔 30 分钟</option>
+                    <option value="1h" selected>每隔 1 小时</option>
+                </select>
+                <div class="hint">💡 系统会按照设定的时间间隔自动执行爬虫任务</div>
+            </div>
+
+            <!-- 按钮 -->
+            <div class="btn-group">
+                <button id="startBtn" class="btn btn-primary" onclick="saveConfig()">
+                    ▶ 启动爬虫（AI模拟）
+                </button>
+            </div>
+            <div id="message" style="display: block; margin-top: 12px; color: #909399; font-size: 12px;">
+                ℹ️ 爬虫功能仅做演示不做真实数据爬取，数据由AI模拟生成，请使用官方开放 API（微博、知乎等均有开发者 API）获取数据。
+            </div>
+        </div>
+
+        <!-- 当前配置列表 -->
+        <div class="config-card">
+            <h2 style="margin-bottom: 20px; color: #2d3748;">
+                当前配置
+                <span id="jobCount" class="status-badge status-running">0 个任务</span>
+            </h2>
+            <div id="configList" class="config-list">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let availableKeywords = [];
+        let selectedKeywords = [];
+        let availablePlatforms = [];
+        let selectedPlatforms = [];
+
+        let cookieStatus = {};
+        let activeCookiePlatform = '';
+
+        let configRefreshTimer = null;
+
+        // 返回今天的 CST 日期字符串 YYYY-MM-DD
+        function getTodayCST() {
+            const now = new Date();
+            const cst = new Date(now.getTime() + (8 * 60 - now.getTimezoneOffset()) * 60000);
+            return cst.toISOString().slice(0, 10);
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('keywordDateInput').value = new Date().toISOString().slice(0, 10);
+            loadAvailableKeywords();
+            loadAvailablePlatforms();
+            loadCurrentConfigs();
+            loadCookieStatus();
+
+            // 每10秒自动刷新配置状态
+            configRefreshTimer = setInterval(loadCurrentConfigs, 10000);
+        });
+
+        // 日期变化时重新加载关键词标签
+        function onKeywordDateChange() {
+            loadAvailableKeywords();
+        }
+
+        // 切换关键词展开/收起
+        function toggleKeywords() {
+            const container = document.getElementById('keywordTags');
+            const icon = document.getElementById('toggleKeywordsIcon');
+            const text = document.getElementById('toggleKeywordsText');
+
+            if (container.classList.contains('collapsed')) {
+                container.classList.remove('collapsed');
+                icon.textContent = '▲';
+                text.textContent = '收起';
+            } else {
+                container.classList.add('collapsed');
+                icon.textContent = '▼';
+                text.textContent = '展开更多';
+            }
+        }
+
+        // 加载可用关键词（按日期过滤）
+        async function loadAvailableKeywords() {
+            try {
+                const date = document.getElementById('keywordDateInput').value;
+                let url = '/monitoring/api/crawler/keywords';
+                if (date) url += '?date=' + encodeURIComponent(date);
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    // 标签只展示每日新闻分析关键词
+                    availableKeywords = result.data.daily || [];
+                    const label = document.getElementById('kwCountLabel');
+                    label.textContent = availableKeywords.length > 0
+                        ? `共 ${availableKeywords.length} 个关键词`
+                        : '该日期暂无关键词数据';
+                    renderKeywordTags();
+                }
+            } catch (error) {
+                console.error('加载关键词失败:', error);
+            }
+        }
+
+        // 渲染关键词标签
+        function renderKeywordTags() {
+            const container = document.getElementById('keywordTags');
+            const input = document.getElementById('manualKeywords');
+            const toggleBtn = document.getElementById('toggleKeywordsBtn');
+            container.innerHTML = '';
+
+            availableKeywords.forEach((keyword, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'keyword-tag';
+
+                // 默认选中第一个并添加到输入框
+                if (index === 0 && !input.value.trim()) {
+                    tag.classList.add('selected');
+                    input.value = keyword;
+                }
+
+                tag.textContent = keyword;
+                tag.onclick = () => toggleKeyword(keyword, tag);
+                container.appendChild(tag);
+            });
+
+            // 检测是否需要显示展开/收起按钮
+            setTimeout(() => {
+                const actualHeight = container.scrollHeight;
+                if (actualHeight > 140) {
+                    toggleBtn.style.display = 'flex';
+                    container.classList.add('collapsed');
+                } else {
+                    toggleBtn.style.display = 'none';
+                    container.classList.remove('collapsed');
+                }
+            }, 0);
+        }
+
+        // 切换关键词选择（直接操作输入框）
+        function toggleKeyword(keyword, element) {
+            const input = document.getElementById('manualKeywords');
+            const currentKeywords = input.value.trim() ? input.value.split(/[,，\s]+/).filter(k => k.trim()) : [];
+            const index = currentKeywords.indexOf(keyword);
+
+            if (index > -1) {
+                // 取消选中：从输入框中移除
+                currentKeywords.splice(index, 1);
+                element.classList.remove('selected');
+            } else {
+                // 选中：添加到输入框
+                if (currentKeywords.length >= 10) {
+                    showMessage('最多只能选择10个关键词', 'error');
+                    return;
+                }
+                currentKeywords.push(keyword);
+                element.classList.add('selected');
+            }
+
+            // 更新输入框的值
+            input.value = currentKeywords.join(', ');
+        }
+
+        // 加载可用平台
+        async function loadAvailablePlatforms() {
+            try {
+                const response = await fetch('/monitoring/api/crawler/platforms');
+                const result = await response.json();
+
+                if (result.success) {
+                    availablePlatforms = result.data;
+                    renderPlatforms();
+                }
+            } catch (error) {
+                console.error('加载平台失败:', error);
+            }
+        }
+
+        // 渲染平台
+        function renderPlatforms() {
+            const container = document.getElementById('platformsGrid');
+            container.innerHTML = '';
+
+            availablePlatforms.forEach((platform, index) => {
+                const item = document.createElement('div');
+                item.className = 'platform-item';
+
+                // 默认选中第一个平台
+                if (index === 0 && selectedPlatforms.length === 0) {
+                    item.classList.add('selected');
+                    selectedPlatforms.push(platform.code);
+                }
+
+                item.innerHTML = `
+                    <div class="platform-icon">${platform.icon}</div>
+                    <div class="platform-name">${platform.name}</div>
+                `;
+                item.onclick = () => togglePlatform(platform.code, item);
+                container.appendChild(item);
+            });
+        }
+
+        // 切换平台选择
+        function togglePlatform(code, element) {
+            const index = selectedPlatforms.indexOf(code);
+
+            if (index > -1) {
+                selectedPlatforms.splice(index, 1);
+                element.classList.remove('selected');
+            } else {
+                selectedPlatforms.push(code);
+                element.classList.add('selected');
+            }
+        }
+
+        // 保存配置
+        async function saveConfig() {
+            // 只从输入框获取关键词
+            const input = document.getElementById('manualKeywords').value.trim();
+
+            if (!input) {
+                showMessage('请至少选择或输入一个关键词', 'error');
+                return;
+            }
+
+            // 解析关键词
+            const finalKeywords = input.split(/[,，\s]+/).filter(k => k.trim());
+
+            // 验证
+            if (finalKeywords.length === 0) {
+                showMessage('请至少选择或输入一个关键词', 'error');
+                return;
+            }
+
+            if (finalKeywords.length > 10) {
+                showMessage('关键词最多10个', 'error');
+                return;
+            }
+
+            if (selectedPlatforms.length === 0) {
+                showMessage('请至少选择一个平台', 'error');
+                return;
+            }
+
+            const interval = document.getElementById('intervalSelect').value;
+
+            // 提交配置
+            try {
+                const response = await fetch('/monitoring/api/crawler/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        keywords: finalKeywords,
+                        platforms: selectedPlatforms,
+                        interval: interval
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('爬虫任务已启动', 'success');
+                    loadCurrentConfigs();
+                } else {
+                    showMessage(result.message || '保存失败', 'error');
+                }
+            } catch (error) {
+                showMessage('网络错误：' + error.message, 'error');
+            }
+        }
+
+        // 加载当前配置
+        async function loadCurrentConfigs() {
+            try {
+                const response = await fetch('/monitoring/api/crawler/configs');
+                const result = await response.json();
+
+                if (result.success) {
+                    renderConfigList(result.data);
+                }
+            } catch (error) {
+                console.error('加载配置失败:', error);
+                document.getElementById('configList').innerHTML = '<div class="loading">加载失败</div>';
+            }
+        }
+
+        // 计算任务的聚合状态
+        function getTaskStatus(task, runningDetails) {
+            const config = task.config;
+            const subTasks = [];
+            for (const kw of config.keywords) {
+                for (const p of config.platforms) {
+                    const key = `${kw}_${p}`;
+                    if (runningDetails[key]) {
+                        subTasks.push(runningDetails[key]);
+                    }
+                }
+            }
+
+            if (subTasks.length === 0) {
+                return { label: '等待中', css: 'status-pending' };
+            }
+
+            const hasRunning = subTasks.some(t => t.status === 'running');
+            const hasFailed = subTasks.some(t => t.status === 'failed' || t.status === 'error');
+            const allCompleted = subTasks.every(t => t.status === 'completed');
+
+            if (hasRunning) return { label: '运行中', css: 'status-running' };
+            if (allCompleted) return { label: '已完成', css: 'status-completed' };
+            if (hasFailed && subTasks.some(t => t.status === 'completed')) return { label: '部分失败', css: 'status-failed' };
+            if (hasFailed) return { label: '失败', css: 'status-failed' };
+            return { label: '等待中', css: 'status-pending' };
+        }
+
+        // 渲染配置列表
+        function renderConfigList(data) {
+            const container = document.getElementById('configList');
+            const configs = data.configs || [];
+            const runningDetails = data.running_details || {};
+
+            document.getElementById('jobCount').textContent = `${configs.length} 个任务`;
+
+            if (configs.length === 0) {
+                container.innerHTML = '<div class="loading">暂无配置</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+
+            configs.forEach(task => {
+                const config = task.config;
+                const item = document.createElement('div');
+                item.className = 'config-item';
+
+                const platformNames = config.platforms.map(p => {
+                    const platform = availablePlatforms.find(ap => ap.code === p);
+                    return platform ? platform.name : p;
+                }).join('、');
+
+                const status = getTaskStatus(task, runningDetails);
+
+                item.innerHTML = `
+                    <div class="config-item-header">
+                        <div class="config-item-title">
+                            📋 任务ID: ${task.id}
+                            <span class="status-badge ${status.css}">${status.label}</span>
+                        </div>
+                        <button class="delete-btn" onclick="deleteConfig('${task.id}')">删除</button>
+                    </div>
+                    <div class="config-item-details">
+                        <div><strong>关键词:</strong> ${config.keywords.join('、')}</div>
+                        <div><strong>平台:</strong> ${platformNames}</div>
+                        <div><strong>执行频率:</strong> ${config.interval === '5min' ? '每5分钟' : config.interval === '10min' ? '每10分钟' : config.interval === '30min' ? '每30分钟' : '每小时'}</div>
+                        <div><strong>创建时间:</strong> ${task.created_at}</div>
+                    </div>
+                `;
+
+                container.appendChild(item);
+            });
+        }
+
+        // 删除配置
+        async function deleteConfig(taskId) {
+            if (!confirm('确定要删除这个配置吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/monitoring/api/crawler/config/${taskId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('删除成功', 'success');
+                    loadCurrentConfigs();
+                } else {
+                    showMessage(result.message || '删除失败', 'error');
+                }
+            } catch (error) {
+                showMessage('网络错误：' + error.message, 'error');
+            }
+        }
+
+        // 加载Cookie配置状态
+        async function loadCookieStatus() {
+            try {
+                const response = await fetch('/monitoring/api/crawler/cookies');
+                const result = await response.json();
+                if (result.success) {
+                    cookieStatus = result.data;
+                    renderCookieTabs();
+                }
+            } catch (error) {
+                console.error('加载Cookie状态失败:', error);
+            }
+        }
+
+        // 渲染Cookie平台标签
+        function renderCookieTabs() {
+            const container = document.getElementById('cookiePlatformTabs');
+            const platformMap = {
+                'xhs': '小红书', 'dy': '抖音', 'bili': 'B站',
+                'wb': '微博', 'tieba': '贴吧', 'zhihu': '知乎', 'ks': '快手'
+            };
+            container.innerHTML = '';
+
+            for (const [code, name] of Object.entries(platformMap)) {
+                const tab = document.createElement('div');
+                const status = cookieStatus[code];
+                const isConfigured = status && status.configured;
+                tab.className = 'cookie-tab' + (code === activeCookiePlatform ? ' active' : '');
+                tab.innerHTML = `${name}<span class="cookie-status ${isConfigured ? 'configured' : 'empty'}"></span>`;
+                tab.onclick = () => selectCookiePlatform(code);
+                container.appendChild(tab);
+            }
+
+            // 默认选中第一个
+            if (!activeCookiePlatform) {
+                selectCookiePlatform('xhs');
+            }
+        }
+
+        // 选择Cookie平台
+        function selectCookiePlatform(code) {
+            activeCookiePlatform = code;
+            document.getElementById('cookieInput').value = '';
+            document.getElementById('cookieSaveStatus').textContent = '';
+
+            // 更新tab样式
+            document.querySelectorAll('.cookie-tab').forEach((tab, i) => {
+                const platforms = ['xhs', 'dy', 'bili', 'wb', 'tieba', 'zhihu', 'ks'];
+                tab.classList.toggle('active', platforms[i] === code);
+            });
+
+            const status = cookieStatus[code];
+            if (status && status.configured) {
+                document.getElementById('cookieInput').placeholder = `已配置 (${status.length} 字符)，粘贴新值可覆盖`;
+            } else {
+                document.getElementById('cookieInput').placeholder = '从浏览器开发者工具(F12)中复制Cookie字符串粘贴到此处\n格式: name1=value1; name2=value2; ...';
+            }
+        }
+
+        // 保存Cookie
+        async function saveCookie() {
+            if (!activeCookiePlatform) {
+                showMessage('请先选择平台', 'error');
+                return;
+            }
+            const cookieValue = document.getElementById('cookieInput').value.trim();
+            if (!cookieValue) {
+                showMessage('请粘贴Cookie字符串', 'error');
+                return;
+            }
+
+            const statusEl = document.getElementById('cookieSaveStatus');
+            statusEl.textContent = '保存中...';
+
+            try {
+                const response = await fetch('/monitoring/api/crawler/cookies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        platform: activeCookiePlatform,
+                        cookies: cookieValue
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    statusEl.textContent = '已保存';
+                    statusEl.style.color = '#48bb78';
+                    loadCookieStatus();
+                } else {
+                    statusEl.textContent = '保存失败: ' + result.message;
+                    statusEl.style.color = '#e53e3e';
+                }
+            } catch (error) {
+                statusEl.textContent = '网络错误';
+                statusEl.style.color = '#e53e3e';
+            }
+        }
+
+        // 显示消息
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.className = `message message-${type}`;
+            messageEl.textContent = text;
+            messageEl.style.display = 'block';
+
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
