@@ -810,7 +810,7 @@ def add_config():
     task = {
         "id": str(uuid.uuid4())[:8],
         "config": {"keywords": keywords, "platforms": platforms, "interval": interval},
-        "created_at": datetime.now(tz=timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S'),
+        "created_at": datetime.now(tz=timezone(timedelta(hours=8))).isoformat(),
     }
     with _configs_lock:
         configs = _load_configs()
